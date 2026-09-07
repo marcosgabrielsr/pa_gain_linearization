@@ -1,2 +1,3 @@
 images/
+data/processed/*
 src/pa_model/__pycache__
