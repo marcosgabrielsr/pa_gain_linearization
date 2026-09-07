@@ -5,10 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pa-gain-linearization"
 version = "0.1.0"
+description = "Modelagem e linearização de ganho de amplificador de potência"
 requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "torch",
+    "scikit-learn",
+    "pandas",
+    "matplotlib",
 ]
 
 [tool.setuptools.packages.find]
