@@ -3,7 +3,9 @@ import torch.nn as nn
 from itertools import product
 from torch.utils.data import DataLoader
 from pa_model import SlidingWindowDataset
-from lstm import PaLSTM, TrainerLSTM, ResultsStorage
+from .lstm import PaLSTM
+from .trainer_lstm import TrainerLSTM
+from .results_storage import ResultsStorage
 
 class GridSearchLSTM():
     def __init__(self, train, val, param_grid, device):
