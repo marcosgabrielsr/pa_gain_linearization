@@ -3,9 +3,8 @@ import torch
 import torch.nn as nn
 import pandas as pd
 from pathlib import Path
-from src.models.lstm import PaLSTM
-from src.models.utils import TrainerLSTM
-from src.core.sliding_window import SlidingWindowDataset
+from lstm import PaLSTM, TrainerLSTM
+from pa_model import SlidingWindowDataset
 from torch.utils.data import DataLoader
 from itertools import product
 
