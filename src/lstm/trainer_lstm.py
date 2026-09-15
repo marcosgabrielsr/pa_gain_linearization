@@ -2,7 +2,7 @@ import copy
 import torch
 import torch.optim as optim
 import numpy as np
-from src.metrics.metrics import RMSE, EVM
+from metrics.metrics import RMSE, EVM
 from .earlystopping import EarlyStopping
 
 class TrainerLSTM():
@@ -38,7 +38,7 @@ class TrainerLSTM():
             history["val_evm"].append(val_results["evm"])
 
             if self.verbose and (epoch+1)%5==0:
-                print(f"Epoch: {epoch+1}/50")
+                print(f"Epoch: {epoch+1}/{self.n_epochs}")
                 for (name,d) in (("train",train_results),("val",val_results)):
                     print(f"{name}:")
                     for k,v in d.items():
@@ -49,10 +49,13 @@ class TrainerLSTM():
                 self.early_stopping.check_early_stop(val_results[key_metric],copy.deepcopy(self.model))
 
                 if self.early_stopping.stop_training:
-                    print(f"Early stopping at epoch {epoch}")
+                    print(f"Early stopping at epoch {epoch+1}")
                     break
 
-        return self.early_stopping.best_metric, self.early_stopping.best_model, history
+        if self.early_stopping is not None:
+            return self.early_stopping.best_metric, self.early_stopping.best_model, history
+        
+        return val_results[key_metric], self.model, history
 
 
     def _fit(self, train_loader):
