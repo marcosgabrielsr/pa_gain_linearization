@@ -12,7 +12,8 @@ class PaLSTM(nn.Module):
             input_size,
             hidden_size,
             num_layers,
-            batch_first=batch_first
+            batch_first=batch_first,
+            dropout=dropout if num_layers > 1 else 0.0
         )
         
         self.fc = nn.Linear(hidden_size, output_size)
