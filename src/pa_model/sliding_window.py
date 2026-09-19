@@ -8,8 +8,8 @@ class SlidingWindowDataset(Dataset):
         self.target_dim = target_dim
 
         # Sinais separados para poder fatiar cada um com seu próprio deslocamento
-        self.x = torch.tensor(np.stack([data.x.real, data.x.imag], axis=1))  # (N, 2)
-        self.y = torch.tensor(np.stack([data.y.real, data.y.imag], axis=1))  # (N, 2)
+        self.x = torch.tensor(np.stack([data.x.real, data.x.imag], axis=1), dtype=torch.float32)  # (N, 2)
+        self.y = torch.tensor(np.stack([data.y.real, data.y.imag], axis=1), dtype=torch.float32)  # (N, 2)
 
         # Realimentacao atrasada de uma amostra: y_prev[n] = y[n-1], com y[-1] = 0.
         # E' esse atraso que faz a mesma fatia terminar em x[t] e em y[t-1].

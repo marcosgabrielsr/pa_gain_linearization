@@ -17,7 +17,7 @@ class GridSearchLSTM():
 
     def _build_model(self, hs, nl, dr):
         model = PaLSTM(input_size=4, hidden_size=hs, num_layers=nl, dropout=dr).to(self.device)
-        return model.to(torch.float64)
+        return model.to(torch.float32)
 
     def run(self, save_path):
         # Executa o grid search sobre os hiperparâmetros e salva os resultados dos melhores modelos em arquivos.

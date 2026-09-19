@@ -78,7 +78,7 @@ class TrainerLSTM():
             y_true.append(targets.cpu())
             total += outputs.size(0)
 
-        y_pred, y_true = np.concatenate(y_pred,axis=0), np.concatenate(y_true,axis=0)
+        y_pred, y_true = np.concatenate(y_pred,axis=0).astype(np.float64), np.concatenate(y_true,axis=0).astype(np.float64)
         y_pred, y_true = self.scaler.inverse_transform(y_pred), self.scaler.inverse_transform(y_true)
         avg_loss = total_loss / total
         rmse = self.rmse.compute(y_true, y_pred)
@@ -103,7 +103,7 @@ class TrainerLSTM():
                 y_true.append(targets.cpu())
                 total += outputs.size(0)
 
-        y_pred, y_true = np.concatenate(y_pred,axis=0), np.concatenate(y_true,axis=0)
+        y_pred, y_true = np.concatenate(y_pred,axis=0).astype(np.float64), np.concatenate(y_true,axis=0).astype(np.float64)
         y_pred, y_true = self.scaler.inverse_transform(y_pred), self.scaler.inverse_transform(y_true)
         avg_loss = total_loss / total
         rmse = self.rmse.compute(y_true, y_pred)
