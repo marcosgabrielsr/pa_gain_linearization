@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from itertools import product
 from torch.utils.data import DataLoader
-from pa_model import SlidingWindowDataset
+from pa_model import SWDataset
 from .lstm import PaLSTM
 from .trainer_lstm import TrainerLSTM
 from .results_storage import ResultsStorage
@@ -48,8 +48,8 @@ class GridSearchLSTM():
 
             # Configurando Dataloader com Sliding Window Dataset para treino e validação
             generator = torch.Generator().manual_seed(self.seed)
-            train_loader = DataLoader(SlidingWindowDataset(self.train_norm, ws), batch_size=bs, shuffle=True, generator=generator)
-            val_loader = DataLoader(SlidingWindowDataset(self.val_norm, ws), batch_size=bs, shuffle=False)
+            train_loader = DataLoader(SWDataset(self.train_norm, ws), batch_size=bs, shuffle=True, generator=generator)
+            val_loader = DataLoader(SWDataset(self.val_norm, ws), batch_size=bs, shuffle=False)
 
             print(f"Combination ({run_id+1}/{n_combinations}): WS = {ws}, HS = {hs}, NL = {nl}, LR = {lr}, DR = {dr}, BS = {bs}\n")
 
