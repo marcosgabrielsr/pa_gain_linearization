@@ -1,6 +1,6 @@
 from pathlib import Path
 from .dataset import Dataset
 from .paths import ROOT, DATA_RAW, DATA_PROCESSED, RESULTS, CHECKPOINTS, LOGS
-from .sliding_window import SlidingWindowDataset
+from .sd_window import SWDataset
 
 Path(RESULTS).mkdir(exist_ok=True)

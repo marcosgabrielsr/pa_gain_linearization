@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 
-class SlidingWindowDataset(Dataset):
+class SWDataset(Dataset):
     def __init__(self, data, window_size, target_dim=1):
         self.window_size = window_size
         self.target_dim = target_dim
