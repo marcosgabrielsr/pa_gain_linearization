@@ -16,17 +16,14 @@ class GridSearchLSTM():
         self.grid_combinations = list(product(param_grid["window_size"],param_grid["hidden_size"],param_grid["num_layers"],param_grid["learning_rate"],param_grid["dropout"],param_grid["batch_size"]))
 
     def _build_model(self, hs, nl, dr):
-        model = PaLSTM(input_size=4, hidden_size=hs, num_layers=nl, dropout=dr).to(self.device)
+        model = PaLSTM(input_size=2, hidden_size=hs, num_layers=nl, dropout=dr).to(self.device)
         return model.to(torch.float32)
 
     def run(self, save_path):
-        # Executa o grid search sobre os hiperparâmetros e salva os resultados dos melhores modelos em arquivos.
-        # Combinações já concluídas em save_path são puladas, permitindo retomar uma busca interrompida.
         n_combinations = len(self.grid_combinations)
         best_metric, best_model, best_params = None, None, None
         storage = ResultsStorage(save_path)
 
-        # Retoma o melhor resultado de uma execução anterior, se houver
         previous_best = storage.load_best(self.device)
         if previous_best is not None:
             best_metric, best_params, state_dict = previous_best
@@ -40,26 +37,20 @@ class GridSearchLSTM():
                 print(f"Combination ({run_id+1}/{n_combinations}) already done, skipping\n")
                 continue
 
-            # Mesma semente para toda combinação: inicialização dos pesos e embaralhamento reprodutíveis
             torch.manual_seed(self.seed)
 
-            # Cria o modelo LSTM com os hiperparâmetros atuais
             model = self._build_model(hs, nl, dr)
 
-            # Configurando Dataloader com Sliding Window Dataset para treino e validação
             generator = torch.Generator().manual_seed(self.seed)
             train_loader = DataLoader(SWDataset(self.train_norm, ws), batch_size=bs, shuffle=True, generator=generator)
             val_loader = DataLoader(SWDataset(self.val_norm, ws), batch_size=bs, shuffle=False)
 
             print(f"Combination ({run_id+1}/{n_combinations}): WS = {ws}, HS = {hs}, NL = {nl}, LR = {lr}, DR = {dr}, BS = {bs}\n")
 
-            # Configurando classe para treinar lstm
             trainer = TrainerLSTM(model, nn.MSELoss(), lr, self.scaler_y, device=self.device, early_stopping=True, verbose=True)
 
-            # Treinando modelo e coletando valores
             metric, model, history = trainer.fit(train_loader, val_loader)
 
-            # Atualiza e salva os melhores valores antes de marcar a combinação como concluída
             if best_metric is None or metric < best_metric:
                 best_metric = metric
                 best_model = model
