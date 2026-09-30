@@ -2,7 +2,7 @@ import copy
 import torch
 import torch.optim as optim
 import numpy as np
-from metrics.metrics import RMSE, EVM
+from metrics.metrics import RMSE, EVM, RSQR
 from .earlystopping import EarlyStopping
 
 class TrainerLSTM():
@@ -16,14 +16,15 @@ class TrainerLSTM():
         self.n_epochs = n_epochs
         self.rmse = RMSE()
         self.evm = EVM()
+        self.rsqr = RSQR()
         self.verbose = verbose
         self.early_stopping = EarlyStopping(patience, delta, verbose) if early_stopping else None
 
     def fit(self, train_loader, val_loader, key_metric="evm"):
-        keys = ("avg_loss", "rmse", "evm")
+        keys = ("avg_loss", "rmse", "evm", "rsqr")
         history = {
-            "train_avg_loss": [], "train_rmse": [], "train_evm": [],
-            "val_avg_loss": [], "val_rmse": [], "val_evm": []
+            "train_avg_loss": [], "train_rmse": [], "train_evm": [], "train_rsqr": [],
+            "val_avg_loss": [], "val_rmse": [], "val_evm": [], "val_rsqr": []
         }
 
         for epoch in range(self.n_epochs):
@@ -33,9 +34,11 @@ class TrainerLSTM():
             history["train_avg_loss"].append(train_results["avg_loss"])
             history["train_rmse"].append(train_results["rmse"])
             history["train_evm"].append(train_results["evm"])
+            history["train_rsqr"].append(train_results["rsqr"])
             history["val_avg_loss"].append(val_results["avg_loss"])
             history["val_rmse"].append(val_results["rmse"])
             history["val_evm"].append(val_results["evm"])
+            history["val_rsqr"].append(val_results["rsqr"])
 
             if self.verbose and (epoch+1)%5==0:
                 print(f"Epoch: {epoch+1}/{self.n_epochs}")
@@ -83,7 +86,8 @@ class TrainerLSTM():
         avg_loss = total_loss / total
         rmse = self.rmse.compute(y_true, y_pred)
         evm = self.evm.compute(y_true, y_pred)
-        return avg_loss, rmse, evm
+        rsqr = self.rsqr.compute(y_true, y_pred)
+        return avg_loss, rmse, evm, rsqr
 
     def evaluate(self, val_loader):
         """Avalia o modelo LSTM no conjunto de validação."""
@@ -108,4 +112,5 @@ class TrainerLSTM():
         avg_loss = total_loss / total
         rmse = self.rmse.compute(y_true, y_pred)
         evm = self.evm.compute(y_true, y_pred)
-        return avg_loss, rmse, evm
+        rsqr = self.rsqr.compute(y_true, y_pred)
+        return avg_loss, rmse, evm, rsqr
