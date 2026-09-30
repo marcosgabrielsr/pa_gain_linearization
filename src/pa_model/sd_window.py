@@ -11,7 +11,7 @@ class SWDataset(Dataset):
         self.x = torch.tensor(np.stack([data.x.real, data.x.imag], axis=1), dtype=torch.float32)  # (N, 2)
 
         # Converting the outupts(targets) on a tensor
-        self.tragets = torch.tensor(np.stack([data.y.real, data.y.imag], axis=1), dtype=torch.float32)
+        self.targets = torch.tensor(np.stack([data.y.real, data.y.imag], axis=1), dtype=torch.float32)
 
     def __len__(self):
         return (len(self.x) - self.window_size - self.target_dim + 2)
