@@ -2,7 +2,7 @@ import copy
 import torch
 import torch.optim as optim
 import numpy as np
-from metrics.metrics import RMSE, EVM, RSQR
+from metrics.metrics import RMSE, EVM, RSQR, AIC, BIC
 from .earlystopping import EarlyStopping
 
 class TrainerLSTM():
@@ -17,14 +17,18 @@ class TrainerLSTM():
         self.rmse = RMSE()
         self.evm = EVM()
         self.rsqr = RSQR()
+        # AIC and BIC penalize the number of trainable parameters of the model
+        n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        self.aic = AIC(n_params)
+        self.bic = BIC(n_params)
         self.verbose = verbose
         self.early_stopping = EarlyStopping(patience, delta, verbose) if early_stopping else None
 
     def fit(self, train_loader, val_loader, key_metric="evm"):
-        keys = ("avg_loss", "rmse", "evm", "rsqr")
+        keys = ("avg_loss", "rmse", "evm", "rsqr", "aic", "bic")
         history = {
-            "train_avg_loss": [], "train_rmse": [], "train_evm": [], "train_rsqr": [],
-            "val_avg_loss": [], "val_rmse": [], "val_evm": [], "val_rsqr": []
+            "train_avg_loss": [], "train_rmse": [], "train_evm": [], "train_rsqr": [], "train_aic": [], "train_bic": [],
+            "val_avg_loss": [], "val_rmse": [], "val_evm": [], "val_rsqr": [], "val_aic": [], "val_bic": []
         }
 
         for epoch in range(self.n_epochs):
@@ -35,10 +39,14 @@ class TrainerLSTM():
             history["train_rmse"].append(train_results["rmse"])
             history["train_evm"].append(train_results["evm"])
             history["train_rsqr"].append(train_results["rsqr"])
+            history["train_aic"].append(train_results["aic"])
+            history["train_bic"].append(train_results["bic"])
             history["val_avg_loss"].append(val_results["avg_loss"])
             history["val_rmse"].append(val_results["rmse"])
             history["val_evm"].append(val_results["evm"])
             history["val_rsqr"].append(val_results["rsqr"])
+            history["val_aic"].append(val_results["aic"])
+            history["val_bic"].append(val_results["bic"])
 
             if self.verbose and (epoch+1)%5==0:
                 print(f"Epoch: {epoch+1}/{self.n_epochs}")
@@ -87,7 +95,9 @@ class TrainerLSTM():
         rmse = self.rmse.compute(y_true, y_pred)
         evm = self.evm.compute(y_true, y_pred)
         rsqr = self.rsqr.compute(y_true, y_pred)
-        return avg_loss, rmse, evm, rsqr
+        aic = self.aic.compute(y_true, y_pred)
+        bic = self.bic.compute(y_true, y_pred)
+        return avg_loss, rmse, evm, rsqr, aic, bic
 
     def evaluate(self, val_loader):
         """Avalia o modelo LSTM no conjunto de validação."""
@@ -113,4 +123,6 @@ class TrainerLSTM():
         rmse = self.rmse.compute(y_true, y_pred)
         evm = self.evm.compute(y_true, y_pred)
         rsqr = self.rsqr.compute(y_true, y_pred)
-        return avg_loss, rmse, evm, rsqr
+        aic = self.aic.compute(y_true, y_pred)
+        bic = self.bic.compute(y_true, y_pred)
+        return avg_loss, rmse, evm, rsqr, aic, bic

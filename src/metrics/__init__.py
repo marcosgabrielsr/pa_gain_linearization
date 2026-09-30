@@ -1,1 +1,1 @@
-from .metrics import RMSE, EVM, RSQR
+from .metrics import RMSE, EVM, RSQR, AIC, BIC

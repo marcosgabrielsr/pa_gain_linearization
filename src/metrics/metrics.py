@@ -31,3 +31,30 @@ class RSQR(Metrics):
         ss_tot = np.sum(np.abs(y_true - np.mean(y_true, axis=0)) ** 2)
         r2 = 1 - ss_res / (ss_tot + epsilon)
         return r2
+
+class AIC(Metrics):
+    """ Akaike Information Criterion, assuming Gaussian residuals: n * ln(SSE / n) + 2k """
+
+    def __init__(self, n_params):
+        self.n_params = n_params
+
+    def compute(self, y_true, y_pred):
+        epsilon = np.finfo(np.float64).eps
+        n = np.size(y_true)
+        mse = np.mean(np.abs(y_true - y_pred) ** 2)
+        aic = n * np.log(mse + epsilon) + 2 * self.n_params
+        return aic
+
+
+class BIC(Metrics):
+    """ Bayesian Information Criterion, assuming Gaussian residuals: n * ln(SSE / n) + k * ln(n) """
+
+    def __init__(self, n_params):
+        self.n_params = n_params
+
+    def compute(self, y_true, y_pred):
+        epsilon = np.finfo(np.float64).eps
+        n = np.size(y_true)
+        mse = np.mean(np.abs(y_true - y_pred) ** 2)
+        bic = n * np.log(mse + epsilon) + self.n_params * np.log(n)
+        return bic

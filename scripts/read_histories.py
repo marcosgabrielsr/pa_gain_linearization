@@ -8,6 +8,8 @@ METRICS = {
     "evm": ("evm",),
     "rmse": ("rmse",),
     "rsqr": ("rsqr", "r2"),
+    "aic": ("aic",),
+    "bic": ("bic",),
 }
 
 # For R² the best value is the highest one, for the others it is the lowest
