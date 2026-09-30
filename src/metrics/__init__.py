@@ -1,1 +1,1 @@
-from .metrics import RMSE, EVM, R2
+from .metrics import RMSE, EVM, RSQR

@@ -23,7 +23,7 @@ class EVM(Metrics):
         evm =  100 * (num / (den + epsilon))
         return evm
 
-class R2(Metrics):
+class RSQR(Metrics):
 
     def compute(self, y_true, y_pred):
         epsilon = np.finfo(np.float64).eps
