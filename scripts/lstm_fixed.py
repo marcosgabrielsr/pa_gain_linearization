@@ -409,8 +409,8 @@ def evm_percent(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", type=Path, default=Path("best_model.pt"))
-    ap.add_argument("--data", type=Path, default=Path("dadosIniciais.csv"))
+    ap.add_argument("--model", type=Path, default=Path("../results/best_model.pt"))
+    ap.add_argument("--data", type=Path, default=Path("../data/processed/expData.csv"))
     ap.add_argument("--T", type=int, default=10)
     args = ap.parse_args(argv)
 
