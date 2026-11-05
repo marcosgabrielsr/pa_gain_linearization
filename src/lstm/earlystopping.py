@@ -1,4 +1,6 @@
 # utils/earlystopping.py
+import copy
+
 class EarlyStopping:
     def __init__(self, patience=5, delta=0, verbose=False):
         self.patience = patience
@@ -12,7 +14,7 @@ class EarlyStopping:
     def check_early_stop(self, val_metric, model):
         if self.best_metric is None or val_metric < self.best_metric - self.delta:
             self.best_metric = val_metric
-            self.best_model = model
+            self.best_model = copy.deepcopy(model)   # copia só quando melhora
             self.no_improvement_count = 0
         else:
             self.no_improvement_count += 1

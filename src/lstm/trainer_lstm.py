@@ -1,9 +1,10 @@
-import copy
 import torch
 import torch.optim as optim
 import numpy as np
 from metrics.metrics import RMSE, EVM, RSQR, AIC, BIC
 from .earlystopping import EarlyStopping
+
+KEYS = ("avg_loss", "rmse", "evm", "rsqr", "aic", "bic")
 
 class TrainerLSTM():
     """ Train the LSTM Model (by default uses Adam as optimizer) """
@@ -25,28 +26,15 @@ class TrainerLSTM():
         self.early_stopping = EarlyStopping(patience, delta, verbose) if early_stopping else None
 
     def fit(self, train_loader, val_loader, key_metric="evm"):
-        keys = ("avg_loss", "rmse", "evm", "rsqr", "aic", "bic")
-        history = {
-            "train_avg_loss": [], "train_rmse": [], "train_evm": [], "train_rsqr": [], "train_aic": [], "train_bic": [],
-            "val_avg_loss": [], "val_rmse": [], "val_evm": [], "val_rsqr": [], "val_aic": [], "val_bic": []
-        }
+        history = {f"{split}_{k}": [] for split in ("train", "val") for k in KEYS}
 
         for epoch in range(self.n_epochs):
-            train_results = dict(zip(keys, self._fit(train_loader)))
-            val_results = dict(zip(keys, self.evaluate(val_loader)))
+            train_results = dict(zip(KEYS, self._fit(train_loader)))
+            val_results = dict(zip(KEYS, self.evaluate(val_loader)))
 
-            history["train_avg_loss"].append(train_results["avg_loss"])
-            history["train_rmse"].append(train_results["rmse"])
-            history["train_evm"].append(train_results["evm"])
-            history["train_rsqr"].append(train_results["rsqr"])
-            history["train_aic"].append(train_results["aic"])
-            history["train_bic"].append(train_results["bic"])
-            history["val_avg_loss"].append(val_results["avg_loss"])
-            history["val_rmse"].append(val_results["rmse"])
-            history["val_evm"].append(val_results["evm"])
-            history["val_rsqr"].append(val_results["rsqr"])
-            history["val_aic"].append(val_results["aic"])
-            history["val_bic"].append(val_results["bic"])
+            for k in KEYS:
+                history[f"train_{k}"].append(train_results[k])
+                history[f"val_{k}"].append(val_results[k])
 
             if self.verbose and (epoch+1)%5==0:
                 print(f"Epoch: {epoch+1}/{self.n_epochs}")
@@ -57,7 +45,7 @@ class TrainerLSTM():
                     print()
 
             if self.early_stopping is not None:
-                self.early_stopping.check_early_stop(val_results[key_metric],copy.deepcopy(self.model))
+                self.early_stopping.check_early_stop(val_results[key_metric], self.model)
 
                 if self.early_stopping.stop_training:
                     print(f"Early stopping at epoch {epoch+1}")
@@ -65,64 +53,54 @@ class TrainerLSTM():
 
         if self.early_stopping is not None:
             return self.early_stopping.best_metric, self.early_stopping.best_model, history
-        
-        return val_results[key_metric], self.model, history
 
+        return val_results[key_metric], self.model, history
 
     def _fit(self, train_loader):
         """ Treina o modelo LSTM por uma época """
         self.model.train()
-        y_pred, y_true = [], []
-        total_loss, total = 0.0, 0
-        
-        for inputs, targets in train_loader:
-            inputs, targets = inputs.to(self.device), targets.to(self.device)
-
-            self.optimizer.zero_grad()
-            outputs = self.model(inputs)
-            loss = self.criterion(outputs, targets)
-            loss.backward()
-            self.optimizer.step()
-
-            total_loss += loss.item() * inputs.size(0)
-            y_pred.append(outputs.detach().cpu())
-            y_true.append(targets.cpu())
-            total += outputs.size(0)
-
-        y_pred, y_true = np.concatenate(y_pred,axis=0).astype(np.float64), np.concatenate(y_true,axis=0).astype(np.float64)
-        y_pred, y_true = self.scaler.inverse_transform(y_pred), self.scaler.inverse_transform(y_true)
-        avg_loss = total_loss / total
-        rmse = self.rmse.compute(y_true, y_pred)
-        evm = self.evm.compute(y_true, y_pred)
-        rsqr = self.rsqr.compute(y_true, y_pred)
-        aic = self.aic.compute(y_true, y_pred)
-        bic = self.bic.compute(y_true, y_pred)
-        return avg_loss, rmse, evm, rsqr, aic, bic
+        return self._run_epoch(train_loader, train=True)
 
     def evaluate(self, val_loader):
         """Avalia o modelo LSTM no conjunto de validação."""
         self.model.eval()
+        with torch.no_grad():
+            return self._run_epoch(val_loader, train=False)
+
+    def _run_epoch(self, loader, train):
+        """ Percorre o loader uma vez. Loss e previsões ficam acumuladas no device:
+            a GPU só é sincronizada com a CPU uma vez, no fim da época. """
         y_pred, y_true = [], []
         total_loss, total = 0.0, 0
 
-        with torch.no_grad():
-            for inputs, targets in val_loader:
-                inputs, targets = inputs.to(self.device), targets.to(self.device)
+        for inputs, targets in loader:
+            inputs, targets = inputs.to(self.device), targets.to(self.device)   # no-op se já estiverem no device
 
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
+            if train:
+                self.optimizer.zero_grad()
+            outputs = self.model(inputs)
+            loss = self.criterion(outputs, targets)
+            if train:
+                loss.backward()
+                self.optimizer.step()
 
-                total_loss += loss.item() * inputs.size(0)
-                y_pred.append(outputs.detach().cpu())
-                y_true.append(targets.cpu())
-                total += outputs.size(0)
+            total_loss += loss.detach().double() * inputs.size(0)    # tensor no device (sem .item())
+            y_pred.append(outputs.detach())
+            y_true.append(targets)
+            total += outputs.size(0)
 
-        y_pred, y_true = np.concatenate(y_pred,axis=0).astype(np.float64), np.concatenate(y_true,axis=0).astype(np.float64)
+        avg_loss = (total_loss / total).item()
+        y_pred = torch.cat(y_pred).cpu().numpy().astype(np.float64)
+        y_true = torch.cat(y_true).cpu().numpy().astype(np.float64)
+        return (avg_loss, *self._metrics(y_true, y_pred))
+
+    def _metrics(self, y_true, y_pred):
+        """ Métricas no domínio original (desnormalizado) """
         y_pred, y_true = self.scaler.inverse_transform(y_pred), self.scaler.inverse_transform(y_true)
-        avg_loss = total_loss / total
-        rmse = self.rmse.compute(y_true, y_pred)
-        evm = self.evm.compute(y_true, y_pred)
-        rsqr = self.rsqr.compute(y_true, y_pred)
-        aic = self.aic.compute(y_true, y_pred)
-        bic = self.bic.compute(y_true, y_pred)
-        return avg_loss, rmse, evm, rsqr, aic, bic
+        return (
+            self.rmse.compute(y_true, y_pred),
+            self.evm.compute(y_true, y_pred),
+            self.rsqr.compute(y_true, y_pred),
+            self.aic.compute(y_true, y_pred),
+            self.bic.compute(y_true, y_pred),
+        )
