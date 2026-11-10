@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 
 class Dataset:
@@ -14,6 +15,17 @@ class Dataset:
         x = df["Xreal"].to_numpy() + 1j * df["Ximg"].to_numpy()
         y = df["Yreal"].to_numpy() + 1j * df["Yimg"].to_numpy()
         return cls(x, y)
+
+    @classmethod
+    def from_split_csv(cls, folder):
+        """Lê um dataset já dividido (formato do OpenDPD): {split}_input.csv e {split}_output.csv, colunas I,Q.
+        Devolve (train, val, test) na ordem temporal original, sem embaralhar."""
+        def read(split):
+            x = pd.read_csv(Path(folder) / f"{split}_input.csv")
+            y = pd.read_csv(Path(folder) / f"{split}_output.csv")
+            return cls(x["I"].to_numpy() + 1j * x["Q"].to_numpy(),
+                       y["I"].to_numpy() + 1j * y["Q"].to_numpy())
+        return tuple(read(s) for s in ("train", "val", "test"))
 
     def split(self, train=0.6, val=0.2):
         """Corta por índice, sem emabaralhar."""
