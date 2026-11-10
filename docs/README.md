@@ -23,6 +23,7 @@ Esta pasta registra **o que foi feito**, **o que cada código faz** e **por que*
 | [0002](adr/0002-dpd-por-aprendizado-direto-com-gemeo-digital.md) | DPD por aprendizado direto (DLA) usando a LSTM como gêmeo digital | Proposta |
 | [0003](adr/0003-dpd-sem-memoria.md) | DPD sem memória (amostra a amostra) | Proposta |
 | [0004](adr/0004-otimizar-auxiliares-manter-grid-search.md) | Otimizar os auxiliares do treino e manter a lógica do grid search | Aceita |
+| [0005](adr/0005-dataset-apa-200mhz.md) | Adicionar o APA_200MHz (OpenDPD) como um segundo PA | Aceita |
 
 Modelo para novos ADRs: [adr/0000-modelo.md](adr/0000-modelo.md).
 
@@ -33,6 +34,7 @@ Modelo para novos ADRs: [adr/0000-modelo.md](adr/0000-modelo.md).
 | [notebooks/dpd_lstm.ipynb](../notebooks/dpd_lstm.ipynb) | [codigo/dpd_lstm.md](codigo/dpd_lstm.md) |
 | [src/pa_model/sd_window.py](../src/pa_model/sd_window.py) | [codigo/sd_window.md](codigo/sd_window.md) |
 | [src/lstm/trainer_lstm.py](../src/lstm/trainer_lstm.py), [earlystopping.py](../src/lstm/earlystopping.py) | [codigo/trainer_lstm.md](codigo/trainer_lstm.md) |
+| [src/pa_model/dataset.py](../src/pa_model/dataset.py) | [codigo/dataset.md](codigo/dataset.md) |
 
 ## Roteiro do DPD
 

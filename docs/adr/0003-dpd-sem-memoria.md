@@ -3,6 +3,7 @@
 - **Data:** 2026-11-05
 - **Status:** Proposta (confirmar na Etapa 3)
 - **Decidido por:** Marcos, com recomendação do Claude
+- **Escopo:** só o nosso PA. Não se aplica ao APA_200MHz, que tem memória ([ADR-0005](0005-dataset-apa-200mhz.md))
 
 ## Contexto
 

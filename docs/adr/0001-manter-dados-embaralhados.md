@@ -3,6 +3,7 @@
 - **Data:** 2026-11-05
 - **Status:** Aceita
 - **Decidido por:** orientador (orientação), confirmado por Marcos
+- **Escopo:** só o nosso PA. O APA_200MHz fica em ordem temporal ([ADR-0005](0005-dataset-apa-200mhz.md))
 
 ## Contexto
 
