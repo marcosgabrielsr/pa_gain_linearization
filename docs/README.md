@@ -36,6 +36,7 @@ Modelo para novos ADRs: [adr/0000-modelo.md](adr/0000-modelo.md).
 | [src/lstm/trainer_lstm.py](../src/lstm/trainer_lstm.py), [earlystopping.py](../src/lstm/earlystopping.py) | [codigo/trainer_lstm.md](codigo/trainer_lstm.md) |
 | [src/pa_model/dataset.py](../src/pa_model/dataset.py) | [codigo/dataset.md](codigo/dataset.md) |
 | [src/metrics/metrics.py](../src/metrics/metrics.py) | [codigo/metrics.md](codigo/metrics.md) |
+| [src/plots/plots.py](../src/plots/plots.py) | [codigo/plots.md](codigo/plots.md) |
 
 ## Roteiro do DPD
 

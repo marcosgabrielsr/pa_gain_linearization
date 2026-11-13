@@ -39,4 +39,4 @@ ACEPR = 10·log10( max(P_erro_inferior, P_erro_superior) / P_sinal_principal )
 
 1. Uma célula de métricas imprime, juntos, EVM, RMSE, R², NMSE e, no APA, o ACEPR.
 2. Os gráficos AM/AM, AM/PM e PM/PM vêm em seguida.
-3. A **PSD** fica no fim (`plot_PSD`): saída medida, previsão da LSTM e erro, com as bordas dos canais tracejadas.
+3. A **PSD** vem depois (`plot_PSD`, de [`src/plots`](plots.md)): saída medida, previsão da LSTM e erro, com as bordas dos canais tracejadas.
