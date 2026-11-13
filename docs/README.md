@@ -35,6 +35,7 @@ Modelo para novos ADRs: [adr/0000-modelo.md](adr/0000-modelo.md).
 | [src/pa_model/sd_window.py](../src/pa_model/sd_window.py) | [codigo/sd_window.md](codigo/sd_window.md) |
 | [src/lstm/trainer_lstm.py](../src/lstm/trainer_lstm.py), [earlystopping.py](../src/lstm/earlystopping.py) | [codigo/trainer_lstm.md](codigo/trainer_lstm.md) |
 | [src/pa_model/dataset.py](../src/pa_model/dataset.py) | [codigo/dataset.md](codigo/dataset.md) |
+| [src/metrics/metrics.py](../src/metrics/metrics.py) | [codigo/metrics.md](codigo/metrics.md) |
 
 ## Roteiro do DPD
 
