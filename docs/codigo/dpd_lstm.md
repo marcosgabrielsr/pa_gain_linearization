@@ -1,128 +1,85 @@
 # `notebooks/dpd_lstm.ipynb`
 
-Notebook principal do DPD. Cada etapa do roteiro (ver [README](../README.md#roteiro-do-dpd)) entra como uma nova seção.
+Notebook principal do DPD, agora para o **APA_200MHz** ([ADR-0007](../adr/0007-dpd-do-apa-com-memoria-sem-back-off.md)). Até 2026-11-18, a Etapa 1 usava a LSTM do nosso PA (`results/best_model.pt`, `expData.csv`). Essa versão continua no histórico do git.
 
-**Pré-requisitos:** pacote instalado (`pip install -e .` na raiz) para os imports `pa_model`, `lstm` e `metrics`; `results/best_model.pt`, `results/best_params.json` e `data/processed/expData.csv` presentes. Execução na máquina com GPU (funciona também em CPU, mais devagar).
+O código do DPD fica no pacote [`src/dpd/`](dpd.md). O notebook só chama as funções e analisa os resultados.
+
+## Pré-requisitos (na máquina do orientador)
+
+1. `git pull` e `pip install -e .` na raiz. O pacote `dpd` é novo, e uma instalação *editable* antiga pode não encontrá-lo.
+2. O grid search do PA do APA já rodado (`grid_search_lstm.ipynb` com `DATASET = "APA_200MHz"`). Ele gera, em `results/APA_200MHz/`, os arquivos `best_model.pt`, `best_params.json` e `scalers.joblib`.
+3. O [`apa_linear_gain.ipynb`](apa_linear_gain.md) rodado, que gera `results/APA_200MHz/linear_gain.json`.
+4. Recomendado: `python scripts/check_dpd.py` antes do grid (ver abaixo).
+
+## Variáveis principais
+
+| Nome | Valor | O que é |
+|---|---|---|
+| `PA_DIR` | `results/APA_200MHz` | LSTM do PA e `linear_gain.json` |
+| `DPD_DIR` | `results/APA_200MHz/dpd` | resultados do grid search do DPD |
+| `WP` | janela da LSTM do PA (de `best_params.json`) | |
+| `WD` | janela do melhor DPD | |
+| `FS`, `BW` | 983,04 MHz e 200 MHz (do `spec.json`) | para o ACEPR e a PSD |
 
 ---
 
 ## Etapa 1 — Carregar o gêmeo digital do PA e validá-lo
 
-**Por quê:** a DLA ([ADR-0002](../adr/0002-dpd-por-aprendizado-direto-com-gemeo-digital.md)) treina o DPD *através* do modelo do PA. Antes de qualquer treino, precisamos garantir duas coisas:
+**Por quê:** o DPD é treinado *através* da LSTM do PA. Antes, é preciso garantir que ela foi carregada como no treino e saber como se comporta fora da faixa medida, porque o DPD vai levar a entrada do PA para lá.
 
-1. o modelo foi carregado exatamente como no treino (mesmos dados, mesma normalização);
-2. sabemos como ele se comporta **fora** da faixa de dados medida, porque o DPD vai empurrar a entrada do PA para lá.
+- **1.2 Dados:** `Dataset.from_split_csv` usa o split oficial (60/20/20), em ordem temporal, o mesmo do grid search do PA.
+- **1.3 LSTM congelada:** `load_pa_twin(PA_DIR, device)` carrega os pesos, a janela `WP` e os **scalers do treino do PA** (`scalers.joblib`), zera o dropout e congela os pesos ([dpd.md](dpd.md#load_pa_twinrun_dir-device--pa-wp-scaler_x-scaler_y)).
+- **1.4 Validação:** NMSE e EVM da LSTM no teste, contra o y medido, com a saída alinhada por `[WP-1:]`. O resultado deve ficar próximo ao do `grid_search_lstm.ipynb`. Uma diferença grande indica janela, scaler ou pesos errados.
+- **1.5 Extrapolação:** AM/AM linear com o PA medido, a LSTM e a LSTM com x × 1,3. A linha tracejada marca o max|x| do treino.
 
-### 1.1 Setup
-
-```python
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.manual_seed(42)
-```
-
-- `device`: usa a GPU se houver; senão, a CPU.
-- `manual_seed(42)`: torna reprodutível qualquer aleatoriedade futura (ex.: inicialização dos pesos do DPD). É a mesma semente do grid search.
-
-### 1.2 Dados e normalização
-
-```python
-ds = Dataset.from_csv(DATA_PROCESSED / "expData.csv")
-train, val, test = ds.split()
-_, scaler_x, scaler_y = train.normalize()
-```
-
-- `Dataset.from_csv` lê as colunas `Xreal, Ximg, Yreal, Yimg` e monta dois vetores complexos: `x` (entrada do PA) e `y` (saída).
-- `split()` corta por índice: 60% treino, 20% validação, 20% teste. É o mesmo corte do grid search.
-- `train.normalize()` ajusta um `StandardScaler` por sinal (um para x, outro para y), **só com o treino**. Cada componente (I e Q) vira `(valor − média) / desvio`.
-  - Por que reajustar em vez de carregar? O ajuste é determinístico: mesmos dados de treino geram os mesmos scalers usados no grid search (`GridSearchLSTM.__init__`). O valor de retorno descartado (`_`) é o próprio treino normalizado, que não usamos aqui.
-
-Duas funções fazem a ponte entre o "mundo físico" e o "mundo da rede":
-
-| Função | Entrada | Saída |
+| À direita da linha tracejada, a curva... | Significado | Consequência para o DPD |
 |---|---|---|
-| `to_tensor(z, scaler)` | complexo `(N,)` em unidades físicas | tensor `(N, 2)` = [I, Q] normalizado, já no `device` |
-| `to_complex(t, scaler)` | tensor `(N, 2)` normalizado | complexo `(N,)` em unidades físicas |
+| achata (satura) | fisicamente plausível | o DPD não consegue passar da saturação |
+| continua subindo | o modelo "acredita" que o PA não satura | o DPD pode explorar esse erro, com um u grande que no PA real não funcionaria |
+| oscila ou cai de forma estranha | extrapolação ruim | os picos do DPD não são confiáveis |
 
-Detalhes de `to_complex`:
-- `.detach()` desliga o tensor do grafo de gradientes, que não é necessário para análise;
-- `.cpu().numpy()` traz o tensor para a CPU, porque o scikit-learn não trabalha com tensores da GPU;
-- `.astype(np.float64)` evita perder precisão ao desnormalizar.
+## Etapa 2 — Ganho linear G
 
-**Regra:** use `scaler_x` com sinais de **entrada** do PA (x, e futuramente u) e `scaler_y` com sinais de **saída** (y, ŷ).
+Lê `linear_gain.json` ([ADR-0006](../adr/0006-ganho-linear-do-apa.md)): G = 1,1660 + j0,0057.
 
-### 1.3 Carregar a LSTM congelada
+Também conta quantas amostras de treino têm |G·x| acima do max|y| de treino. Nessas amostras, o alvo está fora do que o PA entregou nas medições, e o DPD terá de extrapolar. Não há back-off, por decisão do Marcos ([ADR-0007](../adr/0007-dpd-do-apa-com-memoria-sem-back-off.md)).
 
-```python
-params = json.load(open(RESULTS / "best_params.json"))["params"]
-W = params["ws"]
-pa = PaLSTM(2, params["hs"], params["nl"], params["dr"]).to(device)
-pa.load_state_dict(torch.load(RESULTS / "best_model.pt", map_location=device, weights_only=True))
-pa.eval()
-for p in pa.parameters():
-    p.requires_grad_(False)
-```
-
-- `best_params.json` guarda os hiperparâmetros da melhor combinação (`ws` = 10, `hs` = 16, `nl` = 2, `dr` = 0,0). A arquitetura é recriada com eles. O `.pt` contém **só os pesos** (`state_dict`), não a estrutura da rede.
-- `map_location=device`: o arquivo foi salvo em `cuda:0`; isso permite carregá-lo em qualquer dispositivo.
-- `weights_only=True`: carrega apenas tensores, que é mais seguro do que desserializar objetos Python arbitrários.
-- `pa.eval()`: modo de inferência (desliga o dropout; aqui ele já é 0).
-- `requires_grad_(False)`: **congela os pesos**. O otimizador do DPD nunca vai alterá-los. O gradiente, porém, continua atravessando a rede até a **entrada**, e é isso que permite treinar o DPD na Etapa 4.
-
-### 1.4 `pa_forward(u)`: passar um sinal pelo PA
+## Etapa 3 — Grid search do DPD
 
 ```python
-def pa_forward(u):
-    windows = u.unfold(0, W, 1).transpose(1, 2)    # (N-W+1, W, 2)
-    return pa(windows)
+gsearch = GridSearchDPD(train, val, pa, WP, scaler_x, scaler_y, G, param_grid, device)
+best_metric, best_dpd, best_params = gsearch.run(DPD_DIR)
 ```
 
-A LSTM não recebe uma amostra, e sim uma **janela** de W = 10 amostras, e prevê a saída do **último** instante (igual ao `SWDataset`).
+- A grade (36 combinações) e o motivo de cada valor estão no [ADR-0008](../adr/0008-grid-search-do-dpd-sem-baseline.md).
+- Assim como no grid do PA, combinações já feitas em `DPD_DIR` são puladas. Dá para interromper e retomar.
+- Como cada passo atravessa o DPD **e** a LSTM do PA, cada combinação demora mais que no grid do PA.
 
-- `u.unfold(0, W, 1)`: no eixo 0 (tempo), pega fatias de tamanho W com passo 1. A partir de `(N, 2)`, gera `(N-W+1, 2, W)`.
-- `.transpose(1, 2)`: reordena para `(N-W+1, W, 2)`, o formato `(batch, tempo, features)` esperado pela LSTM (`batch_first=True`).
-- **Alinhamento:** a saída k corresponde à amostra k+W−1. As primeiras W−1 = 9 amostras não têm janela completa e ficam sem saída. Por isso as referências são cortadas com `[W-1:]`.
+## Etapa 4 — Resultados
 
-Por que não usar `SWDataset` + `DataLoader`? Na Etapa 4, `u` será a **saída do DPD**, e o gradiente precisa passar pela montagem das janelas. `unfold` é uma operação de tensor diferenciável; um `DataLoader` quebraria o grafo.
+1. **Summary:** todas as combinações, ordenadas pela NMSE de validação.
+2. **Melhor DPD:** carregado de `DPD_DIR` (`ResultsStorage.load_best`), com o histórico:
+   - NMSE de treino e de validação por época;
+   - **max |u|** por época, com uma linha no max|x| de treino. Quanto mais acima da linha, mais o DPD depende da extrapolação da LSTM.
+3. **Teste, sem DPD × com DPD**, sempre contra o alvo G·x:
+   - sem DPD: `run_pa(test.x)[WD-1:]` (a LSTM do PA sozinha);
+   - com DPD: `run_dpd(test.x)`;
+   - os dois cortados para começar em x[WD+WP−2], para comparar as mesmas amostras (`x_t`, `target = G·x_t`);
+   - métricas: NMSE (dB), EVM (%) e ACEPR (dB). Um DPD que funciona **diminui** as três;
+   - max|u| no teste.
+4. **AM/AM e AM/PM** (eixo |x| linear): alvo G·x (cinza), sem DPD (azul) e com DPD (laranja). Com o DPD funcionando, a curva laranja se aproxima da reta do alvo e a AM/PM fica perto de ∠G.
+5. **PSD:** com o DPD, a potência fora do canal principal (bordas tracejadas) deve cair em direção à do alvo.
+6. **Característica do DPD** (|u| × |x|, quadrado): acima da diagonal, o DPD está **expandindo** para compensar a compressão do PA. A linha pontilhada vermelha marca o max|x| de treino, e o que fica acima dela é a extrapolação.
 
-### 1.5 Validação: EVM no teste
+## `scripts/check_dpd.py`
 
-```python
-x_test = to_tensor(test.x, scaler_x)
-with torch.no_grad():
-    y_hat = to_complex(pa_forward(x_test), scaler_y)
-x_ref, y_ref = test.x[W-1:], test.y[W-1:]
-print(f"EVM do PA_LSTM no teste: {EVM().compute(y_ref, y_hat):.3f} %")
+Teste rápido do pipeline na máquina do orientador, antes do grid:
+
+```bash
+python scripts/check_dpd.py                 # ws=5, hs=16, nl=1, 3 épocas
+python scripts/check_dpd.py --ws 10 --epochs 5
 ```
 
-- `torch.no_grad()`: não monta o grafo de gradientes, o que economiza memória (aqui só estamos avaliando).
-- EVM (*Error Vector Magnitude*): `100 · RMS(y_ref − ŷ) / RMS(y_ref)`, em unidades físicas.
-- **Esperado:** valor próximo ao EVM de teste do `grid_search_lstm.ipynb`. Uma diferença grande indicaria um desalinhamento (janela, scaler ou pesos errados).
-- Lembrete ([ADR-0001](../adr/0001-manter-dados-embaralhados.md)): com o vazamento treino→teste, esse EVM é otimista.
-
-### 1.6 Extrapolação: o modelo além da faixa de treino
-
-```python
-alpha = 1.3
-y_ext = to_complex(pa_forward(to_tensor(alpha * test.x, scaler_x)), scaler_y)
-```
-
-- O sinal de teste é multiplicado por 1,3 **em unidades físicas** (antes de normalizar), simulando uma entrada 30% maior que qualquer uma medida.
-- O gráfico AM/AM (|y| × |x|, em **escala linear**, onde a saturação fica visível) sobrepõe:
-  - PA medido;
-  - PA_LSTM (deve coincidir com o medido);
-  - PA_LSTM com x × 1,3;
-  - linha tracejada no máx |x| do treino.
-
-**Como interpretar a região à direita da linha tracejada:**
-
-| Comportamento | Significado | Consequência para o DPD |
-|---|---|---|
-| A curva achata (satura) | Fisicamente plausível | Ok. O DPD só deve evitar pedir mais do que a saturação permite |
-| A curva continua subindo | O modelo "acredita" que o PA nunca satura | O DPD pode explorar esse erro, gerando um u enorme que no PA real não funcionaria → limitar \|u\| |
-| A curva oscila ou cai de forma estranha | Extrapolação ruim da rede | Limitar \|u\| à faixa medida |
-
-Esse resultado orienta a Etapa 2 (escolha de G e do back-off).
-
-### Resultados da Etapa 1
-
-> A preencher após a execução: EVM da célula 1.5 e análise do gráfico da célula 1.6.
+1. O gêmeo é determinístico em `train()` (dropout zerado)?
+2. O DPD não treinado é a identidade (u = x, e DPD+PA = PA)?
+3. Treina **uma** combinação como o `GridSearchDPD` e imprime o tempo por época e o histórico. Serve para estimar o tempo do grid inteiro: tempo por época × épocas (até 50) × 36.

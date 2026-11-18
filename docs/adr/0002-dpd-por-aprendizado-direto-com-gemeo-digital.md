@@ -1,7 +1,7 @@
 # ADR-0002: DPD por aprendizado direto (DLA) usando a LSTM como gêmeo digital
 
 - **Data:** 2026-11-05
-- **Status:** Proposta (confirmar na Etapa 4, ao treinar)
+- **Status:** Aceita (2026-11-18), aplicada ao APA_200MHz no [ADR-0007](0007-dpd-do-apa-com-memoria-sem-back-off.md)
 - **Decidido por:** Marcos, com recomendação do Claude
 
 ## Contexto
