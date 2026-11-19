@@ -62,6 +62,34 @@ def plot_AM_AM(x, y, db=True, title="AM/AM Graph", x_label="|x|", y_label="|y|",
     _finish(ax, created, title, label)
 
 
+def _gain(x, y, db):
+    # In dB the ratio becomes a difference: 20·log10(|y|/|x|) = |y|_dB − |x|_dB
+    return to_decibel(y) - to_decibel(x) if db else np.abs(y) / (np.abs(x) + EPS)
+
+
+def gain_limits(x, y, db=True, q=(1, 99), margin=.1):
+    """Limites do eixo y para o ganho: percentis q de |y|/|x| com uma margem.
+    Os poucos pontos de amplitude muito baixa (ruído) ficam de fora e não achatam a compressão."""
+    lo, hi = np.percentile(_gain(x, y, db), q)
+    pad = margin * (hi - lo)
+    return lo - pad, hi + pad
+
+
+def plot_gain(x, y, db=True, title="Gain Graph", x_label="Input |x|", y_label="Gain |y|/|x| of each input |x|",
+              ax=None, color=None, label=None, ylim=None):
+    """Ganho amostra a amostra, |y|/|x|, em função da magnitude de entrada |x|."""
+    ax, created = _axes(ax)
+    if db:
+        ax.plot(to_decibel(x), _gain(x, y, db), color=color, label=label, **SCATTER)
+        ax.set_xlabel(f"{x_label} (dB)"); ax.set_ylabel(f"{y_label} (dB)")
+    else:
+        ax.plot(np.abs(x), _gain(x, y, db), color=color, label=label, **SCATTER)
+        ax.set_xlabel(x_label); ax.set_ylabel(y_label)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    _finish(ax, created, title, label)
+
+
 def plot_AM_PM(x, y, db=True, degrees=True, remove_offset=True, title="AM/PM Graph", ax=None, color=None, label=None):
     """Diferença de fase (saída - entrada) em função da magnitude de entrada."""
     # Phase difference computed via y * conj(x): already wrapped to [-π, π]
@@ -140,15 +168,16 @@ def plot_PSD(signals, fs, bw=None, title="PSD", ax=None, colors=None):
 def plot_comparison(x, y_true, y_pred, fs=None, bw=None,
                     labels=("Dataset", "LSTM"), colors=(COLOR_DATASET, COLOR_LSTM),
                     title="Dataset vs LSTM"):
-    """Grade 2x3: AM/AM, AM/PM, PM/PM na primeira linha; constelação da saída e PSD (2 colunas)
-    na segunda, com as duas séries sobrepostas. Sem fs (ex.: dados embaralhados), a PSD fica de fora."""
-    fig, axes = plt.subplot_mosaic([["amam", "ampm", "pmpm"], ["const", "psd", "psd"]],
-                                   figsize=(18, 10), constrained_layout=True)
-    a_amam, a_ampm, a_pmpm, a_const, a_psd = (axes[k] for k in ("amam", "ampm", "pmpm", "const", "psd"))
+    """Grade 2x4: AM/AM, ganho |y|/|x|, AM/PM e PM/PM na primeira linha; constelação da saída e PSD
+    (3 colunas) na segunda, com as duas séries sobrepostas. Sem fs (ex.: dados embaralhados), a PSD fica de fora."""
+    fig, axes = plt.subplot_mosaic([["amam", "gain", "ampm", "pmpm"], ["const", "psd", "psd", "psd"]],
+                                   figsize=(24, 10), constrained_layout=True)
+    a_amam, a_gain, a_ampm, a_pmpm, a_const, a_psd = (axes[k] for k in ("amam", "gain", "ampm", "pmpm", "const", "psd"))
     series = ((y_true, labels[0], colors[0]), (y_pred, labels[1], colors[1]))
 
     for y, label, color in series:
         plot_AM_AM(x, y, ax=a_amam, color=color, label=label, title="AM/AM")
+        plot_gain(x, y, ax=a_gain, color=color, label=label, title="Gain", ylim=gain_limits(x, y_true))
         plot_AM_PM(x, y, ax=a_ampm, color=color, label=label, title="AM/PM")
         plot_PM_PM(x, y, ax=a_pmpm, color=color, label=label, title="PM/PM")
         plot_constellation(y, ax=a_const, color=color, label=label, title="Constellation (output)")
