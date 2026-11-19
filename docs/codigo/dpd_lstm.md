@@ -68,8 +68,9 @@ best_metric, best_dpd, best_params = gsearch.run(DPD_DIR)
    - métricas: NMSE (dB), EVM (%) e ACEPR (dB). Um DPD que funciona **diminui** as três;
    - max|u| no teste.
 4. **AM/AM e AM/PM** (eixo |x| linear): alvo G·x (cinza), sem DPD (azul) e com DPD (laranja). Com o DPD funcionando, a curva laranja se aproxima da reta do alvo e a AM/PM fica perto de ∠G.
-5. **PSD:** com o DPD, a potência fora do canal principal (bordas tracejadas) deve cair em direção à do alvo.
-6. **Característica do DPD** (|u| × |x|, quadrado): acima da diagonal, o DPD está **expandindo** para compensar a compressão do PA. A linha pontilhada vermelha marca o max|x| de treino, e o que fica acima dela é a extrapolação.
+5. **Ganho |y|/|x|** (`plot_gain`, eixo |x| linear): sem DPD (azul) e com DPD (laranja), com uma linha tracejada no alvo |G|. Com o DPD funcionando, o ganho fica **constante e igual a |G|** em toda a faixa de |x|, inclusive nos picos, onde sem DPD ele cai (compressão). O eixo y é limitado pelos percentis 1–99 % das duas curvas (`gain_limits`).
+6. **PSD:** com o DPD, a potência fora do canal principal (bordas tracejadas) deve cair em direção à do alvo.
+7. **Característica do DPD** (|u| × |x|, quadrado): acima da diagonal, o DPD está **expandindo** para compensar a compressão do PA. A linha pontilhada vermelha marca o max|x| de treino, e o que fica acima dela é a extrapolação.
 
 ## `scripts/check_dpd.py`
 
